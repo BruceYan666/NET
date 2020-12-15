@@ -1,5 +1,4 @@
 from matplotlib import pyplot as plt
-
 Epoch, ACC_TRAIN, ACC_VAL, Loss = [], [], [], []
 filename1 = '../cache/visual/squeezenet_train.txt'
 filename2 = '../cache/visual/squeezenet_val.txt'

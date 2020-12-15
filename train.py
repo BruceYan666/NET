@@ -71,7 +71,7 @@ def train (epoch, train_loader, cfg, net, args, log):
         log.logger.info('[epoch:%d, iter:%d] Loss: %.03f | Acc: %.3f%% '
               % (epoch + 1, (i + 1 + epoch * length), sum_loss / (i + 1), 100. * correct / total))
     f = open("./cache/visual/"+args.net+"_train.txt", "a")
-    f.write("epoch=%d,acc=%.3f%%,loss=%.03f" % (epoch + 1, 100. * correct / total, sum_loss / length))
+    f.write("epoch=%d,acc=%.3f,loss=%.03f" % (epoch + 1, correct / total, sum_loss / length))
     f.write('\n')
     f.close()
     log.logger.info('Saving Model')

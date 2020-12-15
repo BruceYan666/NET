@@ -34,7 +34,7 @@ def test(net, epoch, test_loader, log, args):
             correct += (predicted == labels).sum()
         log.logger.info('epoch=%d,acc=%.3f%%' % (epoch, 100 * correct / total))
         f = open("./cache/visual/"+args.net+"_test.txt", "a")
-        f.write("epoch=%d,acc=%.3f%%" % (epoch, 100. * correct / total))
+        f.write("epoch=%d,acc=%.3f" % (epoch, correct / total))
         f.write('\n')
         f.close()
 def main():
