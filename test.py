@@ -19,7 +19,7 @@ def dataLoad (cfg):
     test_loader = DataLoader(dataset=test_data, batch_size=cfg.PARA.test.BATCH_SIZE, drop_last=True, shuffle=False, num_workers= cfg.PARA.train.num_workers)
     return test_loader
 
-def test(test_loader):
+def test(epoch, test_loader, log):
     log.logger.info("==> Waiting Test <==")
     with torch.no_grad():
         correct = 0
@@ -34,7 +34,10 @@ def test(test_loader):
             total += labels.size(0)
             correct += (predicted == labels).sum()
         log.logger.info('测试分类准确率为：%.3f%%' % (100 * correct / total))
-
+        f = open("./cache/visual/"+args.net+"_test.txt", "a")
+        f.write("epoch=%d,acc=%.3f%%" % (epoch , 100. * correct / total))
+        f.write('\n')
+        f.close()
 def main():
     args = parser()
     cfg = Config.fromfile(args.config)
@@ -45,9 +48,10 @@ def main():
     global net
     net = get_network(args).cuda()
     net = torch.nn.DataParallel(net, device_ids=cfg.PARA.train.device_ids)
-    checkpoint = torch.load('./checkpoint/'+args.net+'/'+cfg.PARA.train.EPOCH+'ckpt.pth')
-    net.load_state_dict(checkpoint['net'])
-    test(test_loader)
+    for epoch in (1, cfg.PARA.train.EPOCH+1):
+        checkpoint = torch.load('./checkpoint/'+args.net+'/'+ epoch +'ckpt.pth')
+        net.load_state_dict(checkpoint['net'])
+        test(epoch, test_loader, log)
 
 if __name__ == '__main__':
     main()

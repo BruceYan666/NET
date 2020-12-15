@@ -18,8 +18,8 @@ PARA = dict(
         after_trainset_path='../../DATASET/cifar-10/trainset/',
         after_valset_path='../../DATASET/cifar-10/valset/',
         after_testset_path='../../DATASET/cifar-10/testset/',
-        train_data_txt='../../DATASET/cifar-10/train.txt',
-        val_data_txt='../../DATASET/cifar-10/val.txt',
-        test_data_txt='../../DATASET/cifar-10/test.txt'
+        train_data_txt='../DATASET/cifar-10/train.txt',
+        val_data_txt='../DATASET/cifar-10/val.txt',
+        test_data_txt='../DATASET/cifar-10/test.txt'
     )
 )

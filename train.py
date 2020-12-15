@@ -42,7 +42,7 @@ def dataLoad (cfg):
     return train_loader , val_loader
 
 
-def train (epoch, train_loader, cfg, net, args):
+def train (epoch, train_loader, cfg, net, args, log):
     criterion = CrossEntropyloss()
     criterion = criterion.cuda()
     optimizer = optim.SGD(net.parameters(), lr=cfg.PARA.train.LR, momentum=cfg.PARA.train.momentum, weight_decay=cfg.PARA.train.wd)
@@ -83,7 +83,7 @@ def train (epoch, train_loader, cfg, net, args):
         os.mkdir('./cache/checkpoint/'+args.net)
     torch.save(state, './cache/checkpoint/'+args.net+'/'+str(epoch+1)+ 'ckpt.pth')
 
-def validate(epoch, val_loader, net, args):
+def validate(epoch, val_loader, net, args, log):
     log.logger.info('Waiting Validation')
     with torch.no_grad():#强制之后的内容不进行计算图构建,不用梯度反传
         correct = 0
@@ -98,10 +98,6 @@ def validate(epoch, val_loader, net, args):
             total += labels.size(0)
             correct += (predicted == labels).sum()
         log.logger.info('测试分类准确率为：%.3f%%' % (100 * correct / total))
-        f1 = open("./cache/visual/"+args.net+"_val.txt", "a")
-        f1.write("epoch=%d,acc=%.3f%%" % (epoch + 1, 100. * correct / total))
-        f1.write('\n')
-        f1.close()
 
 def main():
     args = parser()
@@ -122,8 +118,8 @@ def main():
         net.load_state_dict(checkpoint['net'])
         start_epoch = checkpoint['epoch']
     for epoch in range(start_epoch, cfg.PARA.train.EPOCH):
-        train(epoch, train_loader, cfg, net, args)
-        validate(epoch, val_loader, net, args)
+        train(epoch, train_loader, cfg, net, args, log)
+        validate(epoch, val_loader, net, args, log)
     log.logger.info("Training Finished, Total EPOCH=%d" % cfg.PARA.train.EPOCH)
 
 if __name__ == '__main__':
