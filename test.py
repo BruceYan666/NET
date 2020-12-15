@@ -19,7 +19,7 @@ def dataLoad (cfg):
     test_loader = DataLoader(dataset=test_data, batch_size=cfg.PARA.test.BATCH_SIZE, drop_last=True, shuffle=False, num_workers= cfg.PARA.train.num_workers)
     return test_loader
 
-def test(epoch, test_loader, log, args):
+def test(net, epoch, test_loader, log, args):
     with torch.no_grad():
         correct = 0
         total = 0
@@ -44,14 +44,13 @@ def main():
     log.logger.info('==> Preparing data <==')
     test_loader = dataLoad(cfg)
     log.logger.info('==> Loading model <==')
-    global net
     net = get_network(args).cuda()
     net = torch.nn.DataParallel(net, device_ids=cfg.PARA.train.device_ids)
     log.logger.info("==> Waiting Test <==")
     for epoch in range(1, cfg.PARA.train.EPOCH+1):
         checkpoint = torch.load('./cache/checkpoint/'+args.net+'/'+ str(epoch) +'ckpt.pth')
         net.load_state_dict(checkpoint['net'])
-        test(epoch, test_loader, log, args)
+        test(net, epoch, test_loader, log, args)
 
 if __name__ == '__main__':
     main()
