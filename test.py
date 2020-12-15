@@ -5,12 +5,12 @@ from dataset.data import CiFar10Dataset,DataPreProcess
 from mmcv import Config
 from torch.utils.data import DataLoader
 from log.logger import Logger
-
-log = Logger('./log/InceptionV4_testlog.txt',level='info')
+from utils import get_network
 
 def parser():
     parser = argparse.ArgumentParser(description='PyTorch CIFAR10 Testing')
     parser.add_argument('--config', '-c', default='./config/config.py', help='config file path')
+    parser.add_argument('--net', '-n', type=str, required=True, help='input which model to use')
     args = parser.parse_args()
     return args
 
@@ -38,18 +38,14 @@ def test(test_loader):
 def main():
     args = parser()
     cfg = Config.fromfile(args.config)
+    log = Logger('./cache/log/' + args.net + '_testlog.txt', level='info')
     log.logger.info('==> Preparing data <==')
     test_loader = dataLoad(cfg)
     log.logger.info('==> Loading model <==')
     global net
-    #net = vgg19().cuda()
-    net = inceptionv4().cuda()
-    #net = squeezenet().cuda()
-    #net = ResNet50().cuda()
+    net = get_network(args).cuda()
     net = torch.nn.DataParallel(net, device_ids=cfg.PARA.train.device_ids)
-    #checkpoint = torch.load('./checkpoint/squeezenet/134ckpt.pth')
-    #checkpoint = torch.load('./checkpoint/ResNet/134ckpt.pth')
-    checkpoint = torch.load('./checkpoint/InceptionV4/134ckpt.pth')
+    checkpoint = torch.load('./checkpoint/'+args.net+'/'+cfg.PARA.train.EPOCH+'ckpt.pth')
     net.load_state_dict(checkpoint['net'])
     test(test_loader)
 

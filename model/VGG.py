@@ -25,8 +25,10 @@ class VGG(nn.Module):
         super(VGG, self).__init__()
         self.features = features
 
+        self.linear = nn.Linear(512, 512)
+
         self.classifier = nn.Sequential(
-            nn.Linear(512, 512),#cifar10输入图片尺寸为32x32，不是224x224
+            # nn.Linear(512, 512),#cifar10输入图片尺寸为32x32，不是224x224
             nn.ReLU(True),
             nn.Dropout(),
             nn.Linear(512, 512),
@@ -34,13 +36,15 @@ class VGG(nn.Module):
             nn.Dropout(),
             nn.Linear(512, num_classes)
         )
-        if init_weights:
-            self._initialize_weights()
+        # if init_weights:
+        #     self._initialize_weights()
 
     def forward(self, x):
         x = self.features(x) #输出x是包含batchsize维度为4的tensor，即(batchsize，channels，x，y)
         x = x.view(x.size(0), -1)#将前面多维度的tensor展平成一维，x.size(0)是batchsize，指转换后有几行。-1是自适应的意思，指在不告诉函数有多少列的情况下，根据原tensor数据和batchsize自动分配列数
         # 比如原来的数据一共12个，batchsize为2，就会view成2*6，batchsize为4，就会就会view成4*3
+        # pdb.set_trace()
+        x = self.linear(x)
         x = self.classifier(x)
         return x
 

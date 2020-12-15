@@ -9,6 +9,7 @@ import argparse
 import pdb
 import mmcv
 import logging
+import importlib
 from model import *
 from loss import *
 from dataset.data import CiFar10Dataset,DataPreProcess
@@ -16,10 +17,8 @@ from log.logger import Logger
 from torch.utils.data import DataLoader
 from mmcv import Config
 from mmcv.runner import load_checkpoint
-from tensorboardX import SummaryWriter
+from utils import get_network
 
-log = Logger('./log/SqueezeNet_trainlog.txt',level='info')
-writer = SummaryWriter('./log')
 #logging.basicConfig(filename='TrainLog.txt', filemode='w', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 #如果在logging.basicConfig()设置filename 和filemode，则只会保存log到文件，不会输出到控制台
 #logging.disable(logging.CRITICAL)
@@ -28,6 +27,7 @@ assert torch.cuda.is_available(), 'Error: CUDA not found!'
 def parser():
     parser = argparse.ArgumentParser(description='PyTorch CIFAR10 Training')
     parser.add_argument('--config', '-c', default='./config/config.py', help='config file path')
+    parser.add_argument('--net', '-n', type=str, required=True, help='input which model to use')
     parser.add_argument('--pretrain', '-p', action='store_true', help='Loading pretrain data')
     parser.add_argument('--resume', '-r', action='store_true', help='resume from checkpoint')
     parser.add_argument('--epoch', '-e', default=None, help='resume from epoch')
@@ -42,11 +42,11 @@ def dataLoad (cfg):
     return train_loader , val_loader
 
 
-def train (epoch, train_loader, cfg, net):
+def train (epoch, train_loader, cfg, net, args):
     criterion = CrossEntropyloss()
     criterion = criterion.cuda()
     optimizer = optim.SGD(net.parameters(), lr=cfg.PARA.train.LR, momentum=cfg.PARA.train.momentum, weight_decay=cfg.PARA.train.wd)
-    log.logger.info('\nEpoch: %d' % (epoch + 1))
+    log.logger.info('Epoch: %d' % (epoch + 1))
     net.train()
     sum_loss = 0.0
     correct = 0.0
@@ -63,13 +63,14 @@ def train (epoch, train_loader, cfg, net):
         loss.backward()
         optimizer.step()
 
+
         sum_loss += loss.item()
         _, predicted = torch.max(outputs.data, 1)
         total += labels.size(0)
         correct += predicted.eq(labels.data).cpu().sum()
         log.logger.info('[epoch:%d, iter:%d] Loss: %.03f | Acc: %.3f%% '
               % (epoch + 1, (i + 1 + epoch * length), sum_loss / (i + 1), 100. * correct / total))
-    f = open("./utils/train.txt", "a")
+    f = open("./cache/visual/"+args.net+"_train.txt", "a")
     f.write("epoch=%d,acc=%.3f%%,loss=%.03f" % (epoch + 1, 100. * correct / total, sum_loss / length))
     f.write('\n')
     f.close()
@@ -78,11 +79,11 @@ def train (epoch, train_loader, cfg, net):
         'net': net.state_dict(),
         'epoch': epoch
     }
-    if not os.path.isdir('./checkpoint/squeezenet'):
-        os.mkdir('./checkpoint/squeezenet')
-    torch.save(state, './checkpoint/squeezenet/'+str(epoch)+ 'ckpt.pth')
+    if not os.path.isdir('./cache/checkpoint/'+args.net):
+        os.mkdir('./cache/checkpoint/'+args.net)
+    torch.save(state, './cache/checkpoint/'+args.net+'/'+str(epoch+1)+ 'ckpt.pth')
 
-def validate(epoch, val_loader, net):
+def validate(epoch, val_loader, net, args):
     log.logger.info('Waiting Validation')
     with torch.no_grad():#强制之后的内容不进行计算图构建,不用梯度反传
         correct = 0
@@ -97,7 +98,7 @@ def validate(epoch, val_loader, net):
             total += labels.size(0)
             correct += (predicted == labels).sum()
         log.logger.info('测试分类准确率为：%.3f%%' % (100 * correct / total))
-        f1 = open("./utils/val.txt", "a")
+        f1 = open("./cache/visual/"+args.net+"_val.txt", "a")
         f1.write("epoch=%d,acc=%.3f%%" % (epoch + 1, 100. * correct / total))
         f1.write('\n')
         f1.close()
@@ -105,26 +106,24 @@ def validate(epoch, val_loader, net):
 def main():
     args = parser()
     cfg = Config.fromfile(args.config)
+    log = Logger('./cache/log/' + args.net + '_trainlog.txt', level='info')
     log.logger.info('Preparing data')
     train_loader , val_loader = dataLoad(cfg)
     start_epoch = 0
     if args.pretrain:
         log.logger.info('Loading Pretrain Data')
-    #net = vgg19(pretrained=args.pretrain).cuda()
-    #net = inceptionv4().cuda()
-    net = squeezenet().cuda()
-    #net = ResNet50(pretrained=args.pretrain).cuda()
+    net = get_network(args).cuda()
     net = torch.nn.DataParallel(net, device_ids=cfg.PARA.train.device_ids)
     torch.backends.cudnn.benchmark = True
     if args.resume:
         log.logger.info('Resuming from checkpoint')
-        weighted_file = os.path.join('./checkpoint/VGG', args.epoch + 'ckpt.pth')
+        weighted_file = os.path.join('./checkpoint/'+args.net, args.epoch + 'ckpt.pth')
         checkpoint = torch.load(weighted_file)
         net.load_state_dict(checkpoint['net'])
         start_epoch = checkpoint['epoch']
     for epoch in range(start_epoch, cfg.PARA.train.EPOCH):
-        train(epoch, train_loader, cfg, net)
-        validate(epoch, val_loader, net)
+        train(epoch, train_loader, cfg, net, args)
+        validate(epoch, val_loader, net, args)
     log.logger.info("Training Finished, Total EPOCH=%d" % cfg.PARA.train.EPOCH)
 
 if __name__ == '__main__':

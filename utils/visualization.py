@@ -1,8 +1,8 @@
 from matplotlib import pyplot as plt
 
 Epoch, ACC_TRAIN, ACC_VAL, Loss = [], [], [], []
-filename1 = './train.txt'
-filename2 = './val.txt'
+filename1 = '../cache/visual/squeezenet_train.txt'
+filename2 = '../cache/visual/squeezenet_val.txt'
 with open(filename1, encoding='utf-8') as f:
     lines = f.readlines()
     for line in lines:
