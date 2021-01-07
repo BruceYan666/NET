@@ -13,6 +13,7 @@ class CrossEntropyloss(nn.Module):
 
 def test():
     torch.manual_seed(2020)
+    # pdb.set_trace()
     output=torch.randn(1,3)
     target=torch.tensor([2])
     loss=CrossEntropyloss()

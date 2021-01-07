@@ -34,6 +34,13 @@ def parser():
     args = parser.parse_args()
     return args
 
+def model_params(net, log):
+    total_params = sum(p.numel() for p in net.parameters())
+    log.logger.info(f'{total_params:,} total parameters.')
+    total_trainable_params = sum(
+        p.numel() for p in net.parameters() if p.requires_grad)
+    log.logger.info(f'{total_trainable_params:,} training parameters.')
+
 def dataLoad (cfg):
     train_data = CiFar10Dataset(txt = cfg.PARA.data.train_data_txt, transform='for_train')
     val_data = CiFar10Dataset(txt = cfg.PARA.data.val_data_txt, transform='for_val')
@@ -42,62 +49,63 @@ def dataLoad (cfg):
     return train_loader , val_loader
 
 
-def train (epoch, train_loader, cfg, net, args, log):
-    criterion = CrossEntropyloss()
-    criterion = criterion.cuda()
-    optimizer = optim.SGD(net.parameters(), lr=cfg.PARA.train.LR, momentum=cfg.PARA.train.momentum, weight_decay=cfg.PARA.train.wd)
-    log.logger.info('Epoch: %d' % (epoch + 1))
-    net.train()
-    sum_loss = 0.0
-    correct = 0.0
-    total = 0.0
-    for i, data in enumerate(train_loader, 0):
-        length = len(train_loader)
-        inputs, labels = data
-        inputs = inputs.cuda()
-        labels = labels.cuda()
-        optimizer.zero_grad()
-
-        outputs = net(inputs)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
-
-
-        sum_loss += loss.item()
-        _, predicted = torch.max(outputs.data, 1)
-        total += labels.size(0)
-        correct += predicted.eq(labels.data).cpu().sum()
-        log.logger.info('[epoch:%d, iter:%d] Loss: %.03f | Acc: %.3f%% '
-              % (epoch + 1, (i + 1 + epoch * length), sum_loss / (i + 1), 100. * correct / total))
-    f = open("./cache/visual/"+args.net+"_train.txt", "a")
-    f.write("epoch=%d,acc=%.3f,loss=%.03f" % (epoch + 1, correct / total, sum_loss / length))
-    f.write('\n')
-    f.close()
-    log.logger.info('Saving Model')
-    state = {
-        'net': net.state_dict(),
-        'epoch': epoch
-    }
-    if not os.path.isdir('./cache/checkpoint/'+args.net):
-        os.mkdir('./cache/checkpoint/'+args.net)
-    torch.save(state, './cache/checkpoint/'+args.net+'/'+str(epoch+1)+ 'ckpt.pth')
-
-def validate(epoch, val_loader, net, args, log):
-    log.logger.info('Waiting Validation')
-    with torch.no_grad():#强制之后的内容不进行计算图构建,不用梯度反传
-        correct = 0
-        total = 0
-        net.eval()
-        for i, data in enumerate(val_loader, 0):
-            images, labels = data
-            images = images.cuda()
+def train (start_epoch, train_loader, val_loader, cfg, net, criterion, optimizer, args, log):
+    for epoch in range(start_epoch, cfg.PARA.train.EPOCH):
+        log.logger.info('Epoch: %d' % (epoch + 1))
+        net.train()
+        sum_loss = 0.0
+        correct = 0.0
+        total = 0.0
+        for i, data in enumerate(train_loader, 0):
+            length = len(train_loader)
+            inputs, labels = data
+            inputs = inputs.cuda()
             labels = labels.cuda()
-            outputs = net(images)
-            _, predicted = torch.max(outputs.data, 1)
+            optimizer.zero_grad()
+
+            outputs = net(inputs)
+            # pdb.set_trace()
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+
+            sum_loss += loss.item()
+            # pdb.set_trace()
+            _, labels = torch.max(labels, 1)   #最大值索引  onehot转为普通label
+            _, predicted = torch.max(outputs.data, 1)  #预测最大索引
             total += labels.size(0)
-            correct += (predicted == labels).sum()
-        log.logger.info('测试分类准确率为：%.3f%%' % (100 * correct / total))
+            correct += predicted.eq(labels.data).cpu().sum()
+            log.logger.info('[epoch:%d, iter:%d] Loss: %.03f | Acc: %.3f%% '
+                  % (epoch + 1, (i + 1 + epoch * length), sum_loss / (i + 1), 100. * correct / total))
+        f = open("./cache/visual/"+args.net+"_train.txt", "a")
+        f.write("epoch=%d,acc=%.3f,loss=%.03f" % (epoch + 1, correct / total, sum_loss / length))
+        f.write('\n')
+        f.close()
+        log.logger.info('Saving Model')
+        state = {
+            'net': net.state_dict(),
+            'epoch': epoch
+        }
+        if not os.path.isdir('./cache/checkpoint/'+args.net):
+            os.mkdir('./cache/checkpoint/'+args.net)
+        torch.save(state, './cache/checkpoint/'+args.net+'/'+str(epoch+1)+ 'ckpt.pth')
+
+        log.logger.info('Waiting Validation')
+        with torch.no_grad():#强制之后的内容不进行计算图构建,不用梯度反传
+            correct = 0
+            total = 0
+            net.eval()
+            for i, data in enumerate(val_loader, 0):
+                images, labels = data
+                images = images.cuda()
+                labels = labels.cuda()
+                outputs = net(images)
+                _, labels = torch.max(labels, 1)
+                _, predicted = torch.max(outputs.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum()
+            log.logger.info('测试分类准确率为：%.3f%%' % (100 * correct / total))
 
 def main():
     args = parser()
@@ -109,17 +117,20 @@ def main():
     if args.pretrain:
         log.logger.info('Loading Pretrain Data')
     net = get_network(args).cuda()
+    model_params(net, log)
+    criterion = CrossEntropy().cuda()
+    # criterion = MeanSquaredError().cuda()
+    optimizer = optim.SGD(net.parameters(), lr=cfg.PARA.train.LR, momentum=cfg.PARA.train.momentum, weight_decay=cfg.PARA.train.wd)
     net = torch.nn.DataParallel(net, device_ids=cfg.PARA.train.device_ids)
     torch.backends.cudnn.benchmark = True
     if args.resume:
         log.logger.info('Resuming from checkpoint')
-        weighted_file = os.path.join('./checkpoint/'+args.net, args.epoch + 'ckpt.pth')
+        weighted_file = os.path.join('./cache/checkpoint/'+args.net, args.epoch + 'ckpt.pth')
         checkpoint = torch.load(weighted_file)
         net.load_state_dict(checkpoint['net'])
         start_epoch = checkpoint['epoch']
-    for epoch in range(start_epoch, cfg.PARA.train.EPOCH):
-        train(epoch, train_loader, cfg, net, args, log)
-        validate(epoch, val_loader, net, args, log)
+
+    train(start_epoch, train_loader, val_loader, cfg, net, criterion, optimizer, args, log)
     log.logger.info("Training Finished, Total EPOCH=%d" % cfg.PARA.train.EPOCH)
 
 if __name__ == '__main__':

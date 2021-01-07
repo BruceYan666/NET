@@ -9,6 +9,7 @@ from utils import get_network
 
 def parser():
     parser = argparse.ArgumentParser(description='PyTorch CIFAR10 Testing')
+    parser.add_argument('--pretrain', '-p', action='store_true', help='Loading pretrain data')
     parser.add_argument('--config', '-c', default='./config/config.py', help='config file path')
     parser.add_argument('--net', '-n', type=str, required=True, help='input which model to use')
     args = parser.parse_args()
@@ -30,6 +31,7 @@ def test(net, epoch, test_loader, log, args):
             labels = labels.cuda()
             outputs = net(images)
             _, predicted = torch.max(outputs.data, 1)
+            _, labels = torch.max(labels, 1)
             total += labels.size(0)
             correct += (predicted == labels).sum()
         log.logger.info('epoch=%d,acc=%.3f%%' % (epoch, 100 * correct / total))

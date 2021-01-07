@@ -1,6 +1,7 @@
 from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
 from PIL import Image
+import torch
 from mmcv import Config
 import argparse
 import pdb
@@ -28,8 +29,14 @@ class CiFar10Dataset(Dataset):
         self.loader = loader
         self.transform = transform
 
+    def Onehot(self, label, num_classes):
+        temp = torch.eye(num_classes)#对角矩阵
+        return temp[label]
+
     def __getitem__(self, index):
         path, label = self.imgs[index]
+        # pdb.set_trace()
+        label = self.Onehot(label, 10)
         img = self.loader(path)
         Trans = DataPreProcess(img)
         if self.transform == 'for_train' or 'for_val':
@@ -59,7 +66,6 @@ class DataPreProcess():
             transforms.ToTensor(),
             transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
         ])(self.img)
-
 def test():
     args = parser()
     cfg = Config.fromfile(args.config)

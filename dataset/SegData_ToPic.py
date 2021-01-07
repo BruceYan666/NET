@@ -20,6 +20,7 @@ def SegDataset_ToPic(path, filename,cfg):
     file = os.path.join(path, filename) # 路径拼接
     with open(file, 'rb')as f:
         datadict = p.load(f, encoding='latin1')
+        # pdb.set_trace()
         x_train = datadict['data']
         t_train = datadict['labels']
         x_train = np.array(x_train)
@@ -77,7 +78,7 @@ def Testset_ToPic(path, cfg):
         img.save(cfg.PARA.data.after_testset_path + name, "png")
 
 def main():
-    args=parser_args()
+    args = parser_args()
     cfg = Config.fromfile(args.config)
     train_batch_path = cfg.PARA.data.original_trainset_path
     child_path = os.listdir(train_batch_path)

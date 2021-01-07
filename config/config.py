@@ -6,7 +6,7 @@ PARA = dict(
         momentum=0.9,
         wd=5e-4,
         num_workers=2,
-        device_ids=[0,1]
+        device_ids=[0]
     ),
     test=dict(
         BATCH_SIZE=100

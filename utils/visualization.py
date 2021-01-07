@@ -10,9 +10,9 @@ with open(filename1, encoding='utf-8') as f:
             epoch = temp[0].split('=')[1]
             acc = temp[1].split('=')[1]
             loss = temp[2].split('=')[1]
-            Epoch.append(epoch)
-            ACC_TRAIN.append(acc)
-            Loss.append(loss)
+            Epoch.append(int(epoch))
+            ACC_TRAIN.append(float(acc))
+            Loss.append(float(loss))
         except:
             continue
 with open(filename2, encoding='utf-8') as f:
@@ -21,7 +21,7 @@ with open(filename2, encoding='utf-8') as f:
         try:
             temp = line.split(',')
             acc = temp[1].split('=')[1]
-            ACC_VAL.append(acc)
+            ACC_VAL.append(float(acc))
         except:
             continue
 
