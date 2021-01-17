@@ -9,7 +9,8 @@ PARA = dict(
         device_ids=[0]
     ),
     test=dict(
-        BATCH_SIZE=100
+        BATCH_SIZE=100,
+        NUM_CLASSES = 10
     ),
     data=dict(
         validation_rate=0.05,

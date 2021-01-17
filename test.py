@@ -1,5 +1,7 @@
 import torch
 import argparse
+import pdb
+import numpy as np
 from model import *
 from dataset.data import CiFar10Dataset,DataPreProcess
 from mmcv import Config
@@ -20,7 +22,14 @@ def dataLoad (cfg):
     test_loader = DataLoader(dataset=test_data, batch_size=cfg.PARA.test.BATCH_SIZE, drop_last=True, shuffle=False, num_workers= cfg.PARA.train.num_workers)
     return test_loader
 
-def test(net, epoch, test_loader, log, args):
+# 更新混淆矩阵
+def confusion_matrix(preds, labels, conf_matrix):
+    for p, t in zip(preds, labels):#将对象中对应的元素打包成一个个元组，然后返回由这些元组组成的对象
+        conf_matrix[t, p] += 1
+    return conf_matrix
+
+def test(net, epoch, test_loader, log, args, cfg):
+    conf_matrix = torch.zeros(cfg.PARA.test.NUM_CLASSES, cfg.PARA.test.NUM_CLASSES)
     with torch.no_grad():
         correct = 0
         total = 0
@@ -30,11 +39,23 @@ def test(net, epoch, test_loader, log, args):
             images = images.cuda()
             labels = labels.cuda()
             outputs = net(images)
-            _, predicted = torch.max(outputs.data, 1)
-            _, labels = torch.max(labels, 1)
+            predicted = torch.max(outputs.data, 1)[1]
+            labels = torch.max(labels, 1)[1]
+            conf_matrix = confusion_matrix(predicted, labels, conf_matrix) #混淆矩阵
             total += labels.size(0)
             correct += (predicted == labels).sum()
-        log.logger.info('epoch=%d,acc=%.3f%%' % (epoch, 100 * correct / total))
+        print(conf_matrix)
+        precision = []
+        recall = []
+        row_sum = torch.sum(conf_matrix, dim=1) #每一行的和
+        col_sum = torch.sum(conf_matrix, dim=0) #每一列的和
+        for i in range(cfg.PARA.test.NUM_CLASSES):
+            precision.append(conf_matrix[i][i] / col_sum[i])
+            recall.append(conf_matrix[i][i] / row_sum[i])
+        prec_aver = np.mean(precision)
+        recall_aver = np.mean(recall)
+        F1 = 2 * prec_aver * recall_aver / (prec_aver + recall_aver)
+        log.logger.info('accuracy=%.3f%%, precision=%.3f%%, recall=%.3f%%, F1=%.3f' % (100 * correct / total, 100 * prec_aver, 100 * recall_aver, F1))
         f = open("./cache/visual/"+args.net+"_test.txt", "a")
         f.write("epoch=%d,acc=%.3f" % (epoch, correct / total))
         f.write('\n')
@@ -49,10 +70,11 @@ def main():
     net = get_network(args).cuda()
     net = torch.nn.DataParallel(net, device_ids=cfg.PARA.train.device_ids)
     log.logger.info("==> Waiting Test <==")
-    for epoch in range(1, cfg.PARA.train.EPOCH+1):
-        checkpoint = torch.load('./cache/checkpoint/'+args.net+'/'+ str(epoch) +'ckpt.pth')
-        net.load_state_dict(checkpoint['net'])
-        test(net, epoch, test_loader, log, args)
+    # for epoch in range(1, cfg.PARA.train.EPOCH+1):
+    epoch = 121
+    checkpoint = torch.load('./cache/checkpoint/'+args.net+'/'+ str(epoch) +'ckpt.pth')
+    net.load_state_dict(checkpoint['net'])
+    test(net, epoch, test_loader, log, args, cfg)
 
 if __name__ == '__main__':
     main()
